@@ -20,7 +20,7 @@ export default function LiveLeaderboardPage() {
     const fetchTeams = async () => {
       const { data, error } = await supabase
         .from("teams") // table name should be lowercase
-        .select("id, name, elims, alive_count, logo")
+        .select("id, name, elims, alive_count, logo, show_on_leaderboard")
         .order("id", { ascending: true });
 
         console.log("Fetched teams:", data, error);
@@ -33,6 +33,7 @@ export default function LiveLeaderboardPage() {
             elims: t.elims,
             aliveCount: t.alive_count,
             logo: t.logo,
+            show_on_leaderboard: t.show_on_leaderboard,
           }))
         );
 
