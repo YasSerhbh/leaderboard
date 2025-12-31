@@ -13,19 +13,21 @@ export type Team = {
 
 interface LeaderboardProps {
   teams: Team[];
+  showLogos?: boolean;
 }
 
 
-  export const Leaderboard: React.FC<LeaderboardProps> = ({ teams }) => {
+
+  export const Leaderboard: React.FC<LeaderboardProps> = ({ teams, showLogos = true }) => {
     // Only show teams where show_on_leaderboard is true (default to true if null/undefined)
     const visibleTeams = teams.filter(
-      (team) => team.show_on_leaderboard == true || team.show_on_leaderboard == undefined || team.show_on_leaderboard == null
+      (team) => team.show_on_leaderboard === true || team.show_on_leaderboard == null
     );
 
     // Table width and row height for compact overlay
     const tableWidth = 340;
-    const rowHeight = 24; // reduced from 30
     const headerHeight = 22; // reduced from 28
+    const rowHeight = 22; // compact row height
     const rankColWidth = 32; // reduced from 38
     const logoColWidth = 30; // reduced from 38
     const teamNameColWidth = 90; // reduced from 96
@@ -72,7 +74,9 @@ interface LeaderboardProps {
               }}
             >
               <th style={{ padding: 0, borderTopLeftRadius: 8, width: rankColWidth, fontWeight: 900, fontSize: 11, color: headerTextColor }}>#</th>
-              <th style={{ padding: 0, width: logoColWidth, fontWeight: 900, fontSize: 11, color: headerTextColor }}> </th>
+              {showLogos && (
+                <th style={{ padding: 0, width: logoColWidth, fontWeight: 900, fontSize: 11, color: headerTextColor }}> </th>
+              )}
               <th style={{ padding: 0, width: teamNameColWidth, fontWeight: 900, fontSize: 11, color: headerTextColor }}>TEAM NAME</th>
               <th style={{ padding: 0, width: statusColWidth, fontWeight: 900, fontSize: 11, borderRight: '1px solid #bdbdbd', borderLeft: '1px solid #bdbdbd', color: headerTextColor }}>STATUS</th>
               <th style={{ padding: 0, borderTopRightRadius: 8, width: elimsColWidth, fontWeight: 900, fontSize: 11, color: headerTextColor }}>ELIMS</th>
@@ -92,36 +96,21 @@ interface LeaderboardProps {
                 }}
               >
                 <td style={{ padding: 0, width: rankColWidth }}>{idx + 1}</td>
-                <td style={{ padding: 0, width: logoColWidth }}>
-                  {team.logo ? (
-                    <img
-                      src={team.logo}
-                      alt={team.name + ' logo'}
-                      style={{ width: 20, height: 20, objectFit: 'cover', borderRadius: 3, background: '#222' }}
-                    />
-                  ) : (
-                    <span
-                      style={{
-                        display: 'inline-block',
-                        width: 20,
-                        height: 20,
-                        borderRadius: 3,
-                        background: '#222',
-                        color: '#fff',
-                        fontSize: 12,
-                        lineHeight: '20px',
-                        textAlign: 'center',
-                        fontWeight: 700,
-                      }}
-                    >
-                      ?
-                    </span>
-                  )}
-                </td>
-                <td style={{ padding: 0, width: teamNameColWidth, textAlign: 'left', paddingLeft: 4 }}>{team.name}</td>
+                {showLogos ? (
+                  <td style={{ padding: 0, width: logoColWidth }}>
+                    {team.logo ? (
+                      <img
+                        src={team.logo}
+                        alt={team.name + ' logo'}
+                        style={{ width: 20, height: 20, objectFit: 'cover', borderRadius: 3, background: '#222' }}
+                      />
+                    ) : null}
+                  </td>
+                ) : null}
+                <td style={{ padding: 0, width: teamNameColWidth, fontWeight: 700 }}>{team.name}</td>
                 <td style={{ padding: 0, width: statusColWidth }}>
-                  <div style={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
-                    {Array.from({ length: statusBarCount }).map((_, i) => (
+                  <div style={{ display: 'flex', justifyContent: 'center', gap: 1 }}>
+                    {[...Array(statusBarCount)].map((_, i) => (
                       <span
                         key={i}
                         style={{

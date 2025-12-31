@@ -103,7 +103,7 @@ export default function AdminLoginPage() {
 
   return (
     <main className="min-h-screen flex flex-col items-center justify-center bg-green-950">
-      <div className="bg-green-900 p-8 rounded-lg flex flex-col gap-4 w-full max-w-3xl items-center">
+      <div className="bg-green-900 p-8 rounded-lg flex flex-col gap-4 w-full items-center">
         <div className="w-full flex flex-row justify-between items-center mb-4">
           <h2 className="text-white text-xl font-bold">Welcome, Admin!</h2>
           <button

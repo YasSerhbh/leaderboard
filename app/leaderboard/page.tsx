@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 import { useEffect, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
@@ -13,20 +15,18 @@ if (supabaseUrl && supabaseKey) {
 
 export default function LiveLeaderboardPage() {
   const [teams, setTeams] = useState<Team[]>([]);
+  const [showLogos, setShowLogos] = useState(true); // default true
 
   useEffect(() => {
     if (!supabase) return;
     // Initial fetch
     const fetchTeams = async () => {
       const { data, error } = await supabase
-        .from("teams") // table name should be lowercase
+        .from("teams")
         .select("id, name, elims, alive_count, logo, show_on_leaderboard")
         .order("id", { ascending: true });
-
-        console.log("Fetched teams:", data, error);
       if (!error && data) {
         setTeams(
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           data.map((t: any) => ({
             id: t.id,
             name: t.name,
@@ -36,28 +36,48 @@ export default function LiveLeaderboardPage() {
             show_on_leaderboard: t.show_on_leaderboard,
           }))
         );
-
       } else {
-        // Optionally, handle error
         setTeams([]);
       }
     };
+    // Fetch global settings for leaderboard
+    const fetchSettings = async () => {
+      const { data, error } = await supabase
+        .from("settings")
+        .select("show_logos")
+        .single<{ show_logos: boolean }>();
+        console.log("Settings fetch:", { data, error });
+      if (!error && data && typeof data.show_logos === "boolean") {
+        setShowLogos(data.show_logos);
+      }
+    };
     fetchTeams();
-
-    // Real-time subscription
-    const channel = supabase
+    fetchSettings();
+    // Subscribe to teams changes
+    const teamsChannel = supabase
       .channel("teams-updates")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "teams" },
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         (_payload) => {
           fetchTeams();
         }
       )
       .subscribe();
+    // Subscribe to settings changes
+    const settingsChannel = supabase
+      .channel("settings-updates")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "settings" },
+        (_payload) => {
+          fetchSettings();
+        }
+      )
+      .subscribe();
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(teamsChannel);
+      supabase.removeChannel(settingsChannel);
     };
   }, []);
 
@@ -70,10 +90,10 @@ export default function LiveLeaderboardPage() {
   }
   return (
     <main
-      className="min-h-screen bg-green-950 flex items-end justify-end"
+      className="min-h-screen bg-green-950 flex flex-col items-end justify-end"
       style={{ padding: 5 }}
     >
-      <Leaderboard teams={teams} />
+      <Leaderboard teams={teams} showLogos={showLogos} />
     </main>
   );
 }
