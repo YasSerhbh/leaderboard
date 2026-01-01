@@ -90,7 +90,7 @@ export default function LiveLeaderboardPage() {
   }
   return (
     <main
-      className="min-h-screen bg-green-950 flex flex-col items-end justify-end"
+      className="min-h-screen bg-[#2E2EFF] flex flex-col items-end justify-end"
       style={{ padding: 5 }}
     >
       <Leaderboard teams={teams} showLogos={showLogos} />
