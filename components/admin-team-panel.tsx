@@ -34,6 +34,10 @@ export default function AdminTeamPanel() {
     // State for deleting a team
     const [deleteLoading, setDeleteLoading] = useState<{ [id: number]: boolean }>({});
 
+    // State for editing elims inline
+    const [editingElimsId, setEditingElimsId] = useState<number | null>(null);
+    const [editingElimsValue, setEditingElimsValue] = useState<string>("");
+
     // State for global show_logos setting
     const [showLogosSetting, setShowLogosSetting] = useState(true);
     const [showLogosLoading, setShowLogosLoading] = useState(false);
@@ -317,24 +321,40 @@ export default function AdminTeamPanel() {
                                         </td>
                                         {/* ...existing code for elims, alive, logo, show, actions... */}
                                         <td className="p-2 align-middle">
-                                            <div className="flex items-center justify-center gap-1">
-                                                <button
-                                                    className="bg-green-700 w-7 h-7 rounded text-white font-bold flex items-center justify-center text-lg hover:bg-green-600 active:bg-green-800 disabled:opacity-50 shadow"
-                                                    onClick={() => updateTeam(team.id, { elims: Math.max(0, team.elims - 1) })}
-                                                    disabled={rowLoading[team.id] || team.elims <= 0}
-                                                    aria-label="Decrease eliminations"
-                                                >
-                                                    -
-                                                </button>
-                                                <span className="w-8 text-center font-semibold">{team.elims}</span>
-                                                <button
-                                                    className="bg-green-700 w-7 h-7 rounded text-white font-bold flex items-center justify-center text-lg hover:bg-green-600 active:bg-green-800 disabled:opacity-50 shadow"
-                                                    onClick={() => updateTeam(team.id, { elims: team.elims + 1 })}
+                                            <div className="flex items-center justify-center">
+                                                <input
+                                                    type="number"
+                                                    className="w-16 px-2 py-1 rounded border border-green-700 bg-green-900 text-white text-center font-semibold focus:outline-none focus:ring focus:ring-green-600 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                    value={editingElimsId === team.id ? editingElimsValue : team.elims}
+                                                    onFocus={() => {
+                                                        setEditingElimsId(team.id);
+                                                        setEditingElimsValue(String(team.elims));
+                                                    }}
+                                                    onChange={(e) => {
+                                                        setEditingElimsValue(e.target.value);
+                                                    }}
+                                                    onBlur={() => {
+                                                        const value = parseInt(editingElimsValue, 10);
+                                                        if (!isNaN(value) && value >= 0 && value !== team.elims) {
+                                                            updateTeam(team.id, { elims: value });
+                                                        } else if (isNaN(value) || value < 0) {
+                                                            updateTeam(team.id, { elims: 0 });
+                                                        }
+                                                        setEditingElimsId(null);
+                                                        setEditingElimsValue("");
+                                                    }}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter') {
+                                                            e.currentTarget.blur();
+                                                        } else if (e.key === 'Escape') {
+                                                            setEditingElimsId(null);
+                                                            setEditingElimsValue("");
+                                                        }
+                                                    }}
+                                                    min={0}
                                                     disabled={rowLoading[team.id]}
-                                                    aria-label="Increase eliminations"
-                                                >
-                                                    +
-                                                </button>
+                                                    aria-label="Eliminations"
+                                                />
                                             </div>
                                         </td>
                                         <td className="p-2 align-middle">
