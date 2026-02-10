@@ -264,7 +264,7 @@ export default function AdminTeamPanel() {
                                         style={{ height: 56 }}
                                     >
                                         {/* ...existing code for each <td>... */}
-                                        <td className="p-2 font-bold align-middle">{team.id}</td>
+                                        <td className="p-2 font-bold align-middle">{idx + 1}</td>
                                         <td className="p-2 align-middle text-left pl-4">
                                             {/* ...existing code for team name edit... */}
                                             {editNameId === team.id ? (
