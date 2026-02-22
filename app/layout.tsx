@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
+import localFont from "next/font/local";
 import { ThemeProvider } from "next-themes";
 import "./globals.css";
 
@@ -19,6 +20,13 @@ const geistSans = Geist({
   subsets: ["latin"],
 });
 
+const countach = localFont({
+  src: "../public/fonts/countach-regular.woff",
+  variable: "--font-countach",
+  display: "swap",
+  weight: "400",
+});
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -26,7 +34,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${geistSans.className} antialiased`}>
+      <body className={`${geistSans.className} ${countach.variable} antialiased`}>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"

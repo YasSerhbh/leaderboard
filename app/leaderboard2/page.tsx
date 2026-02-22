@@ -3,7 +3,7 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { Leaderboard, Team } from "../../components/leaderboard";
+import { ThemedLeaderboard, Team } from "../../components/leaderboard-themed";
 
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -13,11 +13,12 @@ if (supabaseUrl && supabaseKey) {
     supabase = createClient(supabaseUrl, supabaseKey);
 }
 
-export default function LiveLeaderboardPage() {
+export default function LiveLeaderboard2Page() {
     const [teams, setTeams] = useState<Team[]>([]);
-    const [showLogos, setShowLogos] = useState(true); // default true
-    const [isVisible, setIsVisible] = useState(true); // controls animation state
-    const [shouldRender, setShouldRender] = useState(true); // controls DOM presence
+    const [showLogos, setShowLogos] = useState(true);
+    const [isVisible, setIsVisible] = useState(true);
+    const [shouldRender, setShouldRender] = useState(true);
+    const [activeTheme, setActiveTheme] = useState(1);
 
     // Handle animation end to remove from DOM after slide-out
     const handleAnimationEnd = useCallback(() => {
@@ -36,7 +37,6 @@ export default function LiveLeaderboardPage() {
     // Keyboard hotkey support - press 'L' to toggle leaderboard
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            // Toggle on 'L' key (but not when typing in input fields)
             if (e.key === 'l' || e.key === 'L') {
                 if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
                     return;
@@ -75,13 +75,12 @@ export default function LiveLeaderboardPage() {
                 setTeams([]);
             }
         };
-        // Fetch global settings for leaderboard (including visibility)
+        // Fetch global settings (visibility, logos)
         const fetchSettings = async () => {
             const { data, error } = await supabase
                 .from("settings")
                 .select("show_logos, show_leaderboard")
                 .single<{ show_logos: boolean; show_leaderboard?: boolean }>();
-            console.log("Settings fetch:", { data, error });
             if (!error && data) {
                 if (typeof data.show_logos === "boolean") {
                     setShowLogos(data.show_logos);
@@ -90,12 +89,20 @@ export default function LiveLeaderboardPage() {
                     setIsVisible(data.show_leaderboard);
                 }
             }
+            // Fetch active_theme separately so a missing column doesn't break the rest
+            const { data: themeData } = await supabase
+                .from("settings")
+                .select("active_theme")
+                .single<{ active_theme?: number }>();
+            if (themeData && typeof themeData.active_theme === "number") {
+                setActiveTheme(themeData.active_theme);
+            }
         };
         fetchTeams();
         fetchSettings();
         // Subscribe to teams changes
         const teamsChannel = supabase
-            .channel("teams-updates")
+            .channel("teams-updates-lb2")
             .on(
                 "postgres_changes",
                 { event: "*", schema: "public", table: "teams" },
@@ -104,9 +111,9 @@ export default function LiveLeaderboardPage() {
                 }
             )
             .subscribe();
-        // Subscribe to settings changes (for visibility toggle from admin)
+        // Subscribe to settings changes (for visibility toggle & theme switching from admin)
         const settingsChannel = supabase
-            .channel("settings-updates")
+            .channel("settings-updates-lb2")
             .on(
                 "postgres_changes",
                 { event: "*", schema: "public", table: "settings" },
@@ -171,7 +178,7 @@ export default function LiveLeaderboardPage() {
                     className={isVisible ? 'leaderboard-enter' : 'leaderboard-exit'}
                     onAnimationEnd={handleAnimationEnd}
                 >
-                    <Leaderboard teams={teams} showLogos={showLogos} />
+                    <ThemedLeaderboard teams={teams} showLogos={showLogos} activeTheme={activeTheme} />
                 </div>
             )}
         </main>
