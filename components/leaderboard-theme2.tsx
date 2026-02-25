@@ -1,12 +1,34 @@
 import React from "react";
 import { Team } from "./leaderboard-theme1";
 
+export type Theme2Palette = {
+    headerGradientFrom: string;
+    headerGradientTo: string;
+    bodyGradientFrom: string;
+    bodyGradientTo: string;
+    accentBg: string;
+    aliveColor: string;
+    elimColor: string;
+};
+
+export const DEFAULT_THEME2_PALETTE: Theme2Palette = {
+    headerGradientFrom: '#0a4209',
+    headerGradientTo: '#072800',
+    bodyGradientFrom: '#0f5a0d',
+    bodyGradientTo: '#082f02',
+    accentBg: '#f2e4b4',
+    aliveColor: '#0f5a0d',
+    elimColor: '#bc1a26',
+};
+
 interface LeaderboardTheme2Props {
     teams: Team[];
     showLogos?: boolean;
+    fontFamily?: string;
+    colorPalette?: Partial<Theme2Palette>;
 }
 
-export const LeaderboardTheme2: React.FC<LeaderboardTheme2Props> = ({ teams, showLogos = true }) => {
+export const LeaderboardTheme2: React.FC<LeaderboardTheme2Props> = ({ teams, showLogos = true, fontFamily, colorPalette }) => {
     // Only show teams where show_on_leaderboard is true (default to true if null/undefined)
     const visibleTeams = teams
         .filter((team) => team.show_on_leaderboard === true || team.show_on_leaderboard == null)
@@ -24,24 +46,27 @@ export const LeaderboardTheme2: React.FC<LeaderboardTheme2Props> = ({ teams, sho
     const statusColWidth = 44;
     const statusBarCount = 4;
 
-    // Colors — same as Theme 1 for now, adjust later
-    const bgMain = '#1b1464';        // deep navy/indigo
-    const rowGradient = 'linear-gradient(to right, #3d1b95, #300c77)';
+    // Merge palette with defaults
+    const p = { ...DEFAULT_THEME2_PALETTE, ...colorPalette };
+
+    // Colors derived from palette
     const textColor = '#ffffff';
-    const aliveColor = '#0f5a0d';    // blue/indigo status bar
-    const knockedColor = '#fee44b';  // gold/yellow
-    const elimColor = '#bc1a26';     // red
-    const outsideZoneColor = '#0068ed'; // blue overlay for outside zone
+    const aliveColor = p.aliveColor;
+    const elimColor = p.elimColor;
+    // const outsideZoneColor = '#0068ed';
+
+    // Determine the font to use: default to Countach local font, otherwise use provided Google Font
+    const resolvedFont = (!fontFamily || fontFamily === 'Countach')
+        ? 'var(--font-countach), sans-serif'
+        : `"${fontFamily}", sans-serif`;
 
     return (
         <div
             style={{
                 width: tableWidth,
-                // background: bgMain,
                 borderRadius: 0,
-                // boxShadow: '0 4px 32px 0 rgba(0,0,0,0.45)',
                 padding: 0,
-                fontFamily: "var(--font-countach), sans-serif",
+                fontFamily: resolvedFont,
                 color: textColor,
                 overflow: 'hidden',
             }}
@@ -65,7 +90,7 @@ export const LeaderboardTheme2: React.FC<LeaderboardTheme2Props> = ({ teams, sho
                 <thead>
                     <tr
                         style={{
-                            background: 'linear-gradient(to right, #0a4209, #072800)',
+                            background: `linear-gradient(to right, ${p.headerGradientFrom}, ${p.headerGradientTo})`,
                             color: '#ffffff',
                             fontWeight: 600,
                             fontSize: 10,
@@ -85,7 +110,7 @@ export const LeaderboardTheme2: React.FC<LeaderboardTheme2Props> = ({ teams, sho
                         <th style={{ padding: 0, fontWeight: 600, color: '#fff' }}>STATUS</th>
                     </tr>
                 </thead>
-                <tbody style={{ border: '1px solid #0d0a2a', background: 'linear-gradient(to top right, #0f5a0d, #082f02)' }}>
+                <tbody style={{ border: '1px solid #0d0a2a', background: `linear-gradient(to top right, ${p.bodyGradientFrom}, ${p.bodyGradientTo})` }}>
                     {visibleTeams.map((team, idx) => {
                         // In theme2, knocked counts as alive
                         const effectiveAlive = team.aliveCount + (team.knockedCount ?? 0);
@@ -99,7 +124,9 @@ export const LeaderboardTheme2: React.FC<LeaderboardTheme2Props> = ({ teams, sho
                                     fontSize: 15,
                                     fontWeight: 400,
                                     borderBottom: '1px solid #0d0a2a',
-                                    background: 'transparent',
+                                    background: isEliminated
+                                        ? `linear-gradient(to right, ${p.bodyGradientFrom}, ${p.bodyGradientTo})`
+                                        : 'transparent',
                                     filter: isEliminated ? 'brightness(0.35)' : 'none',
                                     transition: 'filter 0.3s ease, background 0.3s ease',
                                 }}
@@ -165,7 +192,7 @@ export const LeaderboardTheme2: React.FC<LeaderboardTheme2Props> = ({ teams, sho
                                     textAlign: 'center',
                                     fontSize: 15,
                                     fontWeight: 400,
-                                    background: '#f2e4b4',
+                                    background: p.accentBg,
                                     color: '#222',
                                 }}>
                                     {team.finishes}
@@ -176,7 +203,7 @@ export const LeaderboardTheme2: React.FC<LeaderboardTheme2Props> = ({ teams, sho
                                     textAlign: 'center',
                                     fontSize: 16,
                                     fontWeight: 400,
-                                    background: '#f2e4b4',
+                                    background: p.accentBg,
                                     color: '#111',
                                 }}>
                                     {team.elims}
@@ -186,7 +213,7 @@ export const LeaderboardTheme2: React.FC<LeaderboardTheme2Props> = ({ teams, sho
                                     padding: 0,
                                     textAlign: 'center',
                                     verticalAlign: 'middle',
-                                    background: '#f2e4b4',
+                                    background: p.accentBg,
                                 }}>
                                     <div style={{ display: 'flex', gap: 2, alignItems: 'center', justifyContent: 'center' }}>
                                         {[...Array(statusBarCount)].map((_, i) => {

@@ -14,11 +14,12 @@ export type Team = {
 interface LeaderboardProps {
     teams: Team[];
     showLogos?: boolean;
+    fontFamily?: string;
 }
 
 
 
-export const Leaderboard: React.FC<LeaderboardProps> = ({ teams, showLogos = true }) => {
+export const Leaderboard: React.FC<LeaderboardProps> = ({ teams, showLogos = true, fontFamily }) => {
     // Only show teams where show_on_leaderboard is true (default to true if null/undefined)
     const visibleTeams = teams.filter(
         (team) => team.show_on_leaderboard === true || team.show_on_leaderboard == null
@@ -51,7 +52,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ teams, showLogos = tru
                 boxShadow: '0 4px 24px 0 rgba(0,0,0,0.25)',
                 border: `2px solid ${borderColor}`,
                 padding: 0,
-                fontFamily: 'Montserrat, Orbitron, Arial, sans-serif',
+                fontFamily: fontFamily ? `"${fontFamily}", sans-serif` : 'Montserrat, Orbitron, Arial, sans-serif',
                 color: '#fff',
             }}
         >

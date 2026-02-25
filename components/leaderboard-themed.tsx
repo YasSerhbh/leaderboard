@@ -7,6 +7,8 @@ interface ThemedLeaderboardProps {
     teams: Team[];
     showLogos?: boolean;
     activeTheme?: number;
+    fontFamily?: string;
+    colorPalette?: Record<string, string>;
 }
 
 /**
@@ -17,13 +19,15 @@ export const ThemedLeaderboard: React.FC<ThemedLeaderboardProps> = ({
     teams,
     showLogos = true,
     activeTheme = 1,
+    fontFamily,
+    colorPalette,
 }) => {
     switch (activeTheme) {
         case 2:
-            return <LeaderboardTheme2 teams={teams} showLogos={showLogos} />;
+            return <LeaderboardTheme2 teams={teams} showLogos={showLogos} fontFamily={fontFamily} colorPalette={colorPalette} />;
         case 1:
         default:
-            return <LeaderboardTheme1 teams={teams} showLogos={showLogos} />;
+            return <LeaderboardTheme1 teams={teams} showLogos={showLogos} fontFamily={fontFamily} colorPalette={colorPalette} />;
     }
 };
 

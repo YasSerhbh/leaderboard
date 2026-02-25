@@ -18,6 +18,19 @@ export default function LiveLeaderboardPage() {
     const [showLogos, setShowLogos] = useState(true); // default true
     const [isVisible, setIsVisible] = useState(true); // controls animation state
     const [shouldRender, setShouldRender] = useState(true); // controls DOM presence
+    const [fontFamily, setFontFamily] = useState<string>('');
+
+    // Dynamically load Google Font when fontFamily changes
+    useEffect(() => {
+        if (!fontFamily || fontFamily === 'Countach') return;
+        const linkId = `google-font-${fontFamily.replace(/\s+/g, '-')}`;
+        if (document.getElementById(linkId)) return; // already loaded
+        const link = document.createElement('link');
+        link.id = linkId;
+        link.rel = 'stylesheet';
+        link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(fontFamily)}:wght@400;600;700;800&display=swap`;
+        document.head.appendChild(link);
+    }, [fontFamily]);
 
     // Handle animation end to remove from DOM after slide-out
     const handleAnimationEnd = useCallback(() => {
@@ -75,12 +88,12 @@ export default function LiveLeaderboardPage() {
                 setTeams([]);
             }
         };
-        // Fetch global settings for leaderboard (including visibility)
+        // Fetch global settings for leaderboard (including visibility and font)
         const fetchSettings = async () => {
             const { data, error } = await supabase
                 .from("settings")
-                .select("show_logos, show_leaderboard")
-                .single<{ show_logos: boolean; show_leaderboard?: boolean }>();
+                .select("show_logos, show_leaderboard, font_family")
+                .single<{ show_logos: boolean; show_leaderboard?: boolean; font_family?: string }>();
             console.log("Settings fetch:", { data, error });
             if (!error && data) {
                 if (typeof data.show_logos === "boolean") {
@@ -88,6 +101,9 @@ export default function LiveLeaderboardPage() {
                 }
                 if (typeof data.show_leaderboard === "boolean") {
                     setIsVisible(data.show_leaderboard);
+                }
+                if (typeof data.font_family === "string" && data.font_family) {
+                    setFontFamily(data.font_family);
                 }
             }
         };
@@ -171,7 +187,7 @@ export default function LiveLeaderboardPage() {
                     className={isVisible ? 'leaderboard-enter' : 'leaderboard-exit'}
                     onAnimationEnd={handleAnimationEnd}
                 >
-                    <Leaderboard teams={teams} showLogos={showLogos} />
+                    <Leaderboard teams={teams} showLogos={showLogos} fontFamily={fontFamily || undefined} />
                 </div>
             )}
         </main>

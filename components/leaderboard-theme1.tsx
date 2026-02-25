@@ -13,15 +13,40 @@ export type Team = {
     outsideZone?: boolean; // optional, blue overlay when outside zone
 };
 
+export type Theme1Palette = {
+    bgMain: string;
+    rowGradientFrom: string;
+    rowGradientTo: string;
+    headerGradientFrom: string;
+    headerGradientTo: string;
+    aliveColor: string;
+    knockedColor: string;
+    elimColor: string;
+    outsideZoneColor: string;
+};
+
+export const DEFAULT_THEME1_PALETTE: Theme1Palette = {
+    bgMain: '#1b1464',
+    rowGradientFrom: '#3d1b95',
+    rowGradientTo: '#300c77',
+    headerGradientFrom: '#2d0182',
+    headerGradientTo: '#190d34',
+    aliveColor: '#5c00e8',
+    knockedColor: '#fee44b',
+    elimColor: '#c5152f',
+    outsideZoneColor: '#0068ed',
+};
 
 interface LeaderboardTheme1Props {
     teams: Team[];
     showLogos?: boolean;
+    fontFamily?: string;
+    colorPalette?: Partial<Theme1Palette>;
 }
 
 
 
-export const LeaderboardTheme1: React.FC<LeaderboardTheme1Props> = ({ teams, showLogos = true }) => {
+export const LeaderboardTheme1: React.FC<LeaderboardTheme1Props> = ({ teams, showLogos = true, fontFamily, colorPalette }) => {
     // Only show teams where show_on_leaderboard is true (default to true if null/undefined)
     const visibleTeams = teams
         .filter((team) => team.show_on_leaderboard === true || team.show_on_leaderboard == null)
@@ -39,18 +64,22 @@ export const LeaderboardTheme1: React.FC<LeaderboardTheme1Props> = ({ teams, sho
     const statusColWidth = 44;
     const statusBarCount = 4;
 
-    // Colors matching reference image
-    const bgMain = '#1b1464';        // deep navy/indigo
-    const bgHeader = '#12103a';      // darker header
-    const headerTextColor = '#c8c8ff'; // light blue/lavender header text
-    const rowGradient = 'linear-gradient(to right, #3d1b95, #300c77)';
-    const borderColor = '#2d2799';   // subtle purple border
+    // Merge palette with defaults
+    const p = { ...DEFAULT_THEME1_PALETTE, ...colorPalette };
+
+    // Colors derived from palette
+    const bgMain = p.bgMain;
+    const rowGradient = `linear-gradient(to right, ${p.rowGradientFrom}, ${p.rowGradientTo})`;
     const textColor = '#ffffff';
-    const aliveColor = '#5c00e8';    // blue/indigo status bar
-    const knockedColor = '#fee44b';  // gold/yellow
-    const elimColor = '#c5152f';     // red
-    const outsideZoneColor = '#0068ed'; // blue overlay for outside zone
-    // #0068ed
+    const aliveColor = p.aliveColor;
+    const knockedColor = p.knockedColor;
+    const elimColor = p.elimColor;
+    const outsideZoneColor = p.outsideZoneColor;
+
+    // Determine the font to use: default to Countach local font, otherwise use provided Google Font
+    const resolvedFont = (!fontFamily || fontFamily === 'Countach')
+        ? 'var(--font-countach), sans-serif'
+        : `"${fontFamily}", sans-serif`;
 
     return (
         <div
@@ -61,7 +90,7 @@ export const LeaderboardTheme1: React.FC<LeaderboardTheme1Props> = ({ teams, sho
                 boxShadow: '0 4px 32px 0 rgba(0,0,0,0.45)',
                 // border: `2px solid ${borderColor}`,
                 padding: 0,
-                fontFamily: "var(--font-countach), sans-serif",
+                fontFamily: resolvedFont,
                 color: textColor,
                 overflow: 'hidden',
             }}
@@ -85,7 +114,7 @@ export const LeaderboardTheme1: React.FC<LeaderboardTheme1Props> = ({ teams, sho
                 <thead>
                     <tr
                         style={{
-                            background: 'linear-gradient(to right, #2d0182, #190d34)',
+                            background: `linear-gradient(to right, ${p.headerGradientFrom}, ${p.headerGradientTo})`,
                             color: '#ffffff',
                             fontWeight: 600,
                             fontSize: 10,

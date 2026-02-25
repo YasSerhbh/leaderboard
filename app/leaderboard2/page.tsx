@@ -19,6 +19,20 @@ export default function LiveLeaderboard2Page() {
     const [isVisible, setIsVisible] = useState(true);
     const [shouldRender, setShouldRender] = useState(true);
     const [activeTheme, setActiveTheme] = useState(1);
+    const [fontFamily, setFontFamily] = useState<string>('Countach');
+    const [colorPalette, setColorPalette] = useState<Record<string, string> | undefined>(undefined);
+
+    // Dynamically load Google Font when fontFamily changes
+    useEffect(() => {
+        if (!fontFamily || fontFamily === 'Countach') return;
+        const linkId = `google-font-${fontFamily.replace(/\s+/g, '-')}`;
+        if (document.getElementById(linkId)) return; // already loaded
+        const link = document.createElement('link');
+        link.id = linkId;
+        link.rel = 'stylesheet';
+        link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(fontFamily)}:wght@400;600;700;800&display=swap`;
+        document.head.appendChild(link);
+    }, [fontFamily]);
 
     // Handle animation end to remove from DOM after slide-out
     const handleAnimationEnd = useCallback(() => {
@@ -75,7 +89,7 @@ export default function LiveLeaderboard2Page() {
                 setTeams([]);
             }
         };
-        // Fetch global settings (visibility, logos)
+        // Fetch global settings (visibility, logos, theme, font)
         const fetchSettings = async () => {
             const { data, error } = await supabase
                 .from("settings")
@@ -89,13 +103,29 @@ export default function LiveLeaderboard2Page() {
                     setIsVisible(data.show_leaderboard);
                 }
             }
-            // Fetch active_theme separately so a missing column doesn't break the rest
+            // Fetch active_theme, font_family, and palette IDs separately so a missing column doesn't break the rest
             const { data: themeData } = await supabase
                 .from("settings")
-                .select("active_theme")
-                .single<{ active_theme?: number }>();
-            if (themeData && typeof themeData.active_theme === "number") {
-                setActiveTheme(themeData.active_theme);
+                .select("active_theme, font_family, active_palette_theme1, active_palette_theme2")
+                .single<{ active_theme?: number; font_family?: string; active_palette_theme1?: number; active_palette_theme2?: number }>();
+            if (themeData) {
+                const theme = typeof themeData.active_theme === "number" ? themeData.active_theme : 1;
+                setActiveTheme(theme);
+                if (typeof themeData.font_family === "string" && themeData.font_family) {
+                    setFontFamily(themeData.font_family);
+                }
+                // Fetch the active palette colors
+                const paletteId = theme === 2 ? themeData.active_palette_theme2 : themeData.active_palette_theme1;
+                if (paletteId) {
+                    const { data: paletteData } = await supabase
+                        .from("color_palettes")
+                        .select("colors")
+                        .eq("id", paletteId)
+                        .single<{ colors: Record<string, string> }>();
+                    if (paletteData?.colors) {
+                        setColorPalette(paletteData.colors);
+                    }
+                }
             }
         };
         fetchTeams();
@@ -122,9 +152,21 @@ export default function LiveLeaderboard2Page() {
                 }
             )
             .subscribe();
+        // Subscribe to color_palettes changes (for live palette edits)
+        const palettesChannel = supabase
+            .channel("palettes-updates-lb2")
+            .on(
+                "postgres_changes",
+                { event: "*", schema: "public", table: "color_palettes" },
+                (_payload) => {
+                    fetchSettings(); // re-fetch to get updated palette colors
+                }
+            )
+            .subscribe();
         return () => {
             supabase.removeChannel(teamsChannel);
             supabase.removeChannel(settingsChannel);
+            supabase.removeChannel(palettesChannel);
         };
     }, []);
 
@@ -178,7 +220,7 @@ export default function LiveLeaderboard2Page() {
                     className={isVisible ? 'leaderboard-enter' : 'leaderboard-exit'}
                     onAnimationEnd={handleAnimationEnd}
                 >
-                    <ThemedLeaderboard teams={teams} showLogos={showLogos} activeTheme={activeTheme} />
+                    <ThemedLeaderboard teams={teams} showLogos={showLogos} activeTheme={activeTheme} fontFamily={fontFamily} colorPalette={colorPalette} />
                 </div>
             )}
         </main>

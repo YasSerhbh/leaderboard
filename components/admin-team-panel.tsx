@@ -3,6 +3,8 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
+import { DEFAULT_THEME1_PALETTE, Theme1Palette } from "./leaderboard-theme1";
+import { DEFAULT_THEME2_PALETTE, Theme2Palette } from "./leaderboard-theme2";
 
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -55,6 +57,44 @@ export default function AdminTeamPanel() {
     const [activeThemeLoading, setActiveThemeLoading] = useState(false);
     const TOTAL_THEMES = 2; // Increment when adding new themes
 
+    // State for font family setting
+    const [fontFamilySetting, setFontFamilySetting] = useState('Countach');
+    const [fontFamilyLoading, setFontFamilyLoading] = useState(false);
+    const [fontSearchInput, setFontSearchInput] = useState('');
+    const [fontDropdownOpen, setFontDropdownOpen] = useState(false);
+
+    // --- Color Palette State ---
+    type PaletteRow = {
+        id: number;
+        theme_number: number;
+        name: string;
+        colors: Record<string, string>;
+        is_default: boolean;
+    };
+    const [palettes, setPalettes] = useState<PaletteRow[]>([]);
+    const [activePaletteTheme1, setActivePaletteTheme1] = useState<number | null>(null);
+    const [activePaletteTheme2, setActivePaletteTheme2] = useState<number | null>(null);
+    const [paletteTab, setPaletteTab] = useState<number>(1); // which theme's palettes to show
+    const [paletteEditorOpen, setPaletteEditorOpen] = useState(false);
+    const [editingPalette, setEditingPalette] = useState<PaletteRow | null>(null); // null = creating new
+    const [editorName, setEditorName] = useState('');
+    const [editorColors, setEditorColors] = useState<Record<string, string>>({});
+    const [paletteSaving, setPaletteSaving] = useState(false);
+    const FONT_OPTIONS = [
+        'Countach',
+        'Inter',
+        'Roboto',
+        'Montserrat',
+        'Orbitron',
+        'Oswald',
+        'Bebas Neue',
+        'Rajdhani',
+        'Teko',
+        'Russo One',
+        'Press Start 2P',
+        'Black Ops One',
+    ];
+
     const removeTeam = async (id: number) => {
         if (deleteLoading[id]) return;
         if (!window.confirm("Are you sure you want to remove this team?")) return;
@@ -76,6 +116,9 @@ export default function AdminTeamPanel() {
         fetchShowLogosSetting();
         fetchShowLeaderboardSetting();
         fetchActiveThemeSetting();
+        fetchFontFamilySetting();
+        fetchPalettes();
+        fetchActivePaletteIds();
     }, []);
 
     const fetchShowLogosSetting = async () => {
@@ -150,6 +193,30 @@ export default function AdminTeamPanel() {
         setActiveThemeLoading(false);
     };
 
+    const fetchFontFamilySetting = async () => {
+        setFontFamilyLoading(true);
+        const { data, error } = await supabase
+            .from("settings")
+            .select("font_family")
+            .single();
+        if (!error && data && typeof data.font_family === "string" && data.font_family) {
+            setFontFamilySetting(data.font_family);
+        }
+        setFontFamilyLoading(false);
+    };
+
+    const updateFontFamilySetting = async (value: string) => {
+        setFontFamilyLoading(true);
+        const { error } = await supabase
+            .from("settings")
+            .update({ font_family: value })
+            .eq("id", 1);
+        if (!error) {
+            setFontFamilySetting(value);
+        }
+        setFontFamilyLoading(false);
+    };
+
     const fetchTeams = async () => {
         setError("");
         const { data, error } = await supabase
@@ -177,6 +244,103 @@ export default function AdminTeamPanel() {
         // Optionally, re-fetch to ensure sync
         await fetchTeams();
         setRowLoading((prev) => ({ ...prev, [id]: false }));
+    };
+
+    // --- Color Palette CRUD ---
+    const fetchPalettes = async () => {
+        const { data } = await supabase
+            .from("color_palettes")
+            .select("*")
+            .order("is_default", { ascending: false })
+            .order("created_at", { ascending: true });
+        if (data) setPalettes(data as PaletteRow[]);
+    };
+
+    const fetchActivePaletteIds = async () => {
+        const { data } = await supabase
+            .from("settings")
+            .select("active_palette_theme1, active_palette_theme2")
+            .single<{ active_palette_theme1?: number; active_palette_theme2?: number }>();
+        if (data) {
+            if (typeof data.active_palette_theme1 === "number") setActivePaletteTheme1(data.active_palette_theme1);
+            if (typeof data.active_palette_theme2 === "number") setActivePaletteTheme2(data.active_palette_theme2);
+        }
+    };
+
+    const setActivePalette = async (themeNum: number, paletteId: number) => {
+        const col = themeNum === 2 ? 'active_palette_theme2' : 'active_palette_theme1';
+        await supabase.from("settings").update({ [col]: paletteId }).eq("id", 1);
+        if (themeNum === 2) setActivePaletteTheme2(paletteId);
+        else setActivePaletteTheme1(paletteId);
+    };
+
+    const savePalette = async () => {
+        setPaletteSaving(true);
+        if (editingPalette) {
+            // Update existing
+            await supabase.from("color_palettes")
+                .update({ name: editorName, colors: editorColors })
+                .eq("id", editingPalette.id);
+        } else {
+            // Create new
+            await supabase.from("color_palettes")
+                .insert({ theme_number: paletteTab, name: editorName || 'Custom', colors: editorColors, is_default: false });
+        }
+        setPaletteSaving(false);
+        setPaletteEditorOpen(false);
+        setEditingPalette(null);
+        fetchPalettes();
+    };
+
+    const deletePalette = async (id: number, themeNum: number) => {
+        await supabase.from("color_palettes").delete().eq("id", id);
+        // If this was the active palette, revert to default
+        const activeId = themeNum === 2 ? activePaletteTheme2 : activePaletteTheme1;
+        if (activeId === id) {
+            const defaultPalette = palettes.find(p => p.theme_number === themeNum && p.is_default);
+            if (defaultPalette) setActivePalette(themeNum, defaultPalette.id);
+        }
+        fetchPalettes();
+    };
+
+    const openCreateEditor = () => {
+        const defaults = paletteTab === 2
+            ? (DEFAULT_THEME2_PALETTE as Record<string, string>)
+            : (DEFAULT_THEME1_PALETTE as Record<string, string>);
+        setEditingPalette(null);
+        setEditorName('');
+        setEditorColors({ ...defaults });
+        setPaletteEditorOpen(true);
+    };
+
+    const openEditEditor = (palette: PaletteRow) => {
+        setEditingPalette(palette);
+        setEditorName(palette.name);
+        setEditorColors({ ...palette.colors });
+        setPaletteEditorOpen(true);
+    };
+
+    const PALETTE_COLOR_LABELS: Record<number, Record<string, string>> = {
+        1: {
+            bgMain: 'Background',
+            rowGradientFrom: 'Row Gradient Start',
+            rowGradientTo: 'Row Gradient End',
+            headerGradientFrom: 'Header Gradient Start',
+            headerGradientTo: 'Header Gradient End',
+            aliveColor: 'Alive Status',
+            knockedColor: 'Knocked Status',
+            elimColor: 'Eliminated Status',
+            outsideZoneColor: 'Outside Zone',
+        },
+        2: {
+            headerGradientFrom: 'Header Gradient Start',
+            headerGradientTo: 'Header Gradient End',
+            bodyGradientFrom: 'Body Gradient Start',
+            bodyGradientTo: 'Body Gradient End',
+            accentBg: 'Accent Background',
+            aliveColor: 'Alive Status',
+            elimColor: 'Eliminated Status',
+        },
     };
 
     return (
@@ -227,6 +391,95 @@ export default function AdminTeamPanel() {
                             </button>
                         ))}
                     </div>
+                </div>
+                {/* Font Family Selector — Autocomplete Combobox */}
+                <div className="mb-4 flex items-center gap-3 flex-wrap">
+                    <span className="text-green-300 font-semibold">Font Family:</span>
+                    <div className="relative" style={{ minWidth: 220 }}>
+                        <input
+                            className="w-full px-3 py-2 rounded-lg bg-gray-800 text-white text-sm border border-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all placeholder-gray-500"
+                            type="text"
+                            placeholder="Search or type a font name..."
+                            value={fontSearchInput}
+                            onChange={(e) => {
+                                setFontSearchInput(e.target.value);
+                                setFontDropdownOpen(true);
+                            }}
+                            onFocus={() => {
+                                setFontDropdownOpen(true);
+                                if (!fontSearchInput) setFontSearchInput('');
+                            }}
+                            onBlur={() => {
+                                // Delay so click on suggestion registers first
+                                setTimeout(() => setFontDropdownOpen(false), 150);
+                            }}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    const match = FONT_OPTIONS.find(f => f.toLowerCase() === fontSearchInput.trim().toLowerCase());
+                                    const value = match || fontSearchInput.trim();
+                                    if (value) {
+                                        updateFontFamilySetting(value);
+                                        setFontSearchInput('');
+                                        setFontDropdownOpen(false);
+                                    }
+                                }
+                                if (e.key === 'Escape') {
+                                    setFontSearchInput('');
+                                    setFontDropdownOpen(false);
+                                    (e.target as HTMLInputElement).blur();
+                                }
+                            }}
+                            disabled={fontFamilyLoading}
+                        />
+                        {fontDropdownOpen && (() => {
+                            const query = fontSearchInput.toLowerCase();
+                            const filtered = FONT_OPTIONS.filter(f =>
+                                f.toLowerCase().includes(query)
+                            );
+                            if (filtered.length === 0 && !fontSearchInput.trim()) return null;
+                            return (
+                                <div className="absolute z-50 left-0 right-0 mt-1 bg-gray-800 border border-gray-600 rounded-lg shadow-xl max-h-48 overflow-y-auto">
+                                    {filtered.map((font) => (
+                                        <button
+                                            key={font}
+                                            type="button"
+                                            className={`w-full text-left px-3 py-2 text-sm transition-colors ${
+                                                fontFamilySetting === font
+                                                    ? 'bg-purple-600/30 text-purple-200 font-semibold'
+                                                    : 'text-gray-200 hover:bg-gray-700'
+                                            }`}
+                                            onMouseDown={(e) => e.preventDefault()}
+                                            onClick={() => {
+                                                updateFontFamilySetting(font);
+                                                setFontSearchInput('');
+                                                setFontDropdownOpen(false);
+                                            }}
+                                        >
+                                            {font}{font === 'Countach' && ' ⭐'}{fontFamilySetting === font && ' ✓'}
+                                        </button>
+                                    ))}
+                                    {fontSearchInput.trim() && !FONT_OPTIONS.some(f => f.toLowerCase() === fontSearchInput.trim().toLowerCase()) && (
+                                        <button
+                                            type="button"
+                                            className="w-full text-left px-3 py-2 text-sm text-amber-300 hover:bg-gray-700 border-t border-gray-700 transition-colors"
+                                            onMouseDown={(e) => e.preventDefault()}
+                                            onClick={() => {
+                                                updateFontFamilySetting(fontSearchInput.trim());
+                                                setFontSearchInput('');
+                                                setFontDropdownOpen(false);
+                                            }}
+                                        >
+                                            Use &quot;{fontSearchInput.trim()}&quot; from Google Fonts →
+                                        </button>
+                                    )}
+                                </div>
+                            );
+                        })()}
+                    </div>
+                    <span className="text-xs px-2.5 py-1 rounded-full bg-purple-600/20 text-purple-300 border border-purple-500/30 font-medium">
+                        {fontFamilySetting}{fontFamilyLoading && ' ...'}
+                    </span>
                 </div>
                 <form
                     className="flex flex-wrap gap-3 items-end mb-2"
@@ -612,6 +865,198 @@ export default function AdminTeamPanel() {
                     </div>{/* close .min-w-[900px]... */}
                 </div>{/* close .w-full overflow-x-auto */}
             </div>{/* close .bg-green-950/80... Teams List */}
+
+            {/* ═══════════════════════ Color Palettes Section ═══════════════════════ */}
+            <div className="bg-green-950/80 rounded-xl shadow-lg p-6 border border-green-800">
+                <h2 className="text-2xl font-bold text-green-200 mb-4 flex items-center gap-2">
+                    🎨 Color Palettes
+                </h2>
+
+                {/* Theme Tabs */}
+                <div className="flex gap-2 mb-4">
+                    {[1, 2].map((t) => (
+                        <button
+                            key={t}
+                            className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${
+                                paletteTab === t
+                                    ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
+                                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                            }`}
+                            onClick={() => { setPaletteTab(t); setPaletteEditorOpen(false); }}
+                        >
+                            Theme {t}
+                        </button>
+                    ))}
+                </div>
+
+                {/* Palette Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+                    {palettes
+                        .filter((p) => p.theme_number === paletteTab)
+                        .map((palette) => {
+                            const isActive = paletteTab === 1
+                                ? activePaletteTheme1 === palette.id
+                                : activePaletteTheme2 === palette.id;
+                            const colors = Object.values(palette.colors);
+                            return (
+                                <div
+                                    key={palette.id}
+                                    className={`relative rounded-xl p-4 border-2 transition-all cursor-pointer group ${
+                                        isActive
+                                            ? 'border-purple-500 bg-purple-600/10 shadow-lg shadow-purple-500/20'
+                                            : 'border-gray-700 bg-gray-800/60 hover:border-gray-500'
+                                    }`}
+                                    onClick={() => setActivePalette(paletteTab, palette.id)}
+                                >
+                                    {/* Active Badge */}
+                                    {isActive && (
+                                        <span className="absolute -top-2 -right-2 bg-purple-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow">
+                                            ACTIVE
+                                        </span>
+                                    )}
+
+                                    {/* Palette Name */}
+                                    <div className="flex items-center justify-between mb-3">
+                                        <span className="font-bold text-white text-sm">
+                                            {palette.name}
+                                            {palette.is_default && (
+                                                <span className="ml-1.5 text-[10px] bg-gray-700 text-gray-300 px-1.5 py-0.5 rounded-full">DEFAULT</span>
+                                            )}
+                                        </span>
+                                    </div>
+
+                                    {/* Color Swatches */}
+                                    <div className="flex gap-1.5 mb-3">
+                                        {colors.map((c, i) => (
+                                            <div
+                                                key={i}
+                                                className="w-6 h-6 rounded-md border border-white/20 shadow-sm"
+                                                style={{ background: c }}
+                                                title={c}
+                                            />
+                                        ))}
+                                    </div>
+
+                                    {/* Actions */}
+                                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        {!palette.is_default && (
+                                            <>
+                                                <button
+                                                    className="text-xs bg-gray-700 text-white px-2.5 py-1 rounded-md hover:bg-gray-600 transition"
+                                                    onClick={(e) => { e.stopPropagation(); openEditEditor(palette); }}
+                                                >
+                                                    ✏️ Edit
+                                                </button>
+                                                <button
+                                                    className="text-xs bg-red-700/80 text-white px-2.5 py-1 rounded-md hover:bg-red-600 transition"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        if (confirm(`Delete palette "${palette.name}"?`)) deletePalette(palette.id, palette.theme_number);
+                                                    }}
+                                                >
+                                                    🗑️ Delete
+                                                </button>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
+
+                    {/* Create New Palette Card */}
+                    <div
+                        className="rounded-xl p-4 border-2 border-dashed border-gray-600 bg-gray-800/30 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-purple-500 hover:bg-purple-600/5 transition-all min-h-[120px]"
+                        onClick={openCreateEditor}
+                    >
+                        <span className="text-2xl">➕</span>
+                        <span className="text-sm text-gray-400 font-medium">New Palette</span>
+                    </div>
+                </div>
+
+                {/* Palette Editor Modal */}
+                {paletteEditorOpen && (
+                    <div className="bg-gray-900/95 rounded-xl border border-purple-500/40 p-5 shadow-2xl">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-lg font-bold text-purple-200">
+                                {editingPalette ? `Edit "${editingPalette.name}"` : 'Create New Palette'}
+                            </h3>
+                            <button
+                                className="text-gray-400 hover:text-white text-xl transition"
+                                onClick={() => setPaletteEditorOpen(false)}
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        {/* Name Input */}
+                        <div className="mb-4">
+                            <label className="block text-xs text-gray-400 mb-1 font-medium">Palette Name</label>
+                            <input
+                                className="w-full max-w-xs px-3 py-2 rounded-lg bg-gray-800 text-white text-sm border border-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                                value={editorName}
+                                onChange={(e) => setEditorName(e.target.value)}
+                                placeholder="e.g. Neon Night, Ocean Breeze..."
+                            />
+                        </div>
+
+                        {/* Color Pickers Grid */}
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-5">
+                            {Object.entries(PALETTE_COLOR_LABELS[paletteTab] || {}).map(([key, label]) => (
+                                <div key={key} className="flex flex-col gap-1">
+                                    <label className="text-[11px] text-gray-400 font-medium">{label}</label>
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            type="color"
+                                            value={editorColors[key] || '#000000'}
+                                            onChange={(e) => setEditorColors(prev => ({ ...prev, [key]: e.target.value }))}
+                                            className="w-8 h-8 rounded-md border border-gray-600 cursor-pointer bg-transparent"
+                                        />
+                                        <input
+                                            type="text"
+                                            value={editorColors[key] || ''}
+                                            onChange={(e) => setEditorColors(prev => ({ ...prev, [key]: e.target.value }))}
+                                            className="flex-1 px-2 py-1 rounded bg-gray-800 text-white text-xs border border-gray-600 font-mono focus:outline-none focus:ring-1 focus:ring-purple-500"
+                                            placeholder="#000000"
+                                        />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Preview Strip */}
+                        <div className="mb-4">
+                            <label className="block text-xs text-gray-400 mb-1 font-medium">Preview</label>
+                            <div className="flex gap-1 p-2 bg-gray-800 rounded-lg">
+                                {Object.entries(editorColors).map(([key, color]) => (
+                                    <div
+                                        key={key}
+                                        className="flex-1 h-8 rounded-md border border-white/10"
+                                        style={{ background: color }}
+                                        title={`${PALETTE_COLOR_LABELS[paletteTab]?.[key] || key}: ${color}`}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Save / Cancel */}
+                        <div className="flex gap-3">
+                            <button
+                                className="bg-purple-600 text-white px-5 py-2 rounded-lg font-bold text-sm hover:bg-purple-700 disabled:opacity-50 transition shadow-lg shadow-purple-600/20"
+                                onClick={savePalette}
+                                disabled={paletteSaving || !editorName.trim()}
+                            >
+                                {paletteSaving ? 'Saving...' : editingPalette ? 'Update Palette' : 'Create Palette'}
+                            </button>
+                            <button
+                                className="bg-gray-700 text-gray-300 px-5 py-2 rounded-lg font-bold text-sm hover:bg-gray-600 transition"
+                                onClick={() => setPaletteEditorOpen(false)}
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
     );
 

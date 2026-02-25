@@ -58,7 +58,7 @@ export default function AdminLoginPage() {
             placeholder="Email"
             value={email}
             onChange={e => setEmail(e.target.value)}
-            className="p-2 rounded bg-green-100"
+            className="p-2 rounded bg-green-100 text-black"
             required
           />
           <input
@@ -66,7 +66,7 @@ export default function AdminLoginPage() {
             placeholder="Password"
             value={password}
             onChange={e => setPassword(e.target.value)}
-            className="p-2 rounded bg-green-100"
+            className="p-2 rounded bg-green-100 text-black"
             required
           />
           {error && <div className="text-red-400 text-sm text-center">{error}</div>}
