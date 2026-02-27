@@ -33,9 +33,29 @@ export default function AdminLoginPage() {
     e.preventDefault();
     setLoading(true);
     setError("");
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) setError(error.message);
-    setLoading(false);
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        console.error("[Admin Login] Auth error full response:", error);
+        const detail = [
+          error.message,
+          error.status ? `Status: ${error.status}` : null,
+          "name" in error && error.name ? `Type: ${error.name}` : null,
+        ]
+          .filter(Boolean)
+          .join(" | ");
+        setError(detail);
+      }
+    } catch (err: unknown) {
+      console.error("[Admin Login] Network/unexpected error:", err);
+      const msg =
+        err instanceof Error
+          ? `${err.name}: ${err.message}`
+          : String(err);
+      setError(`Network error — ${msg}. Check your internet connection and that Supabase is reachable at ${supabaseUrl}.`);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleLogout = async () => {
