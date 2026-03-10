@@ -187,7 +187,9 @@ export default function AdminTeamPanel() {
             .from("settings")
             .update({ active_theme: value })
             .eq("id", 1);
-        if (!error) {
+        if (error) {
+            setError(`Failed to switch theme: ${error.message}. The 'active_theme' column may be missing from your settings table.`);
+        } else {
             setActiveThemeSetting(value);
         }
         setActiveThemeLoading(false);
@@ -555,7 +557,7 @@ export default function AdminTeamPanel() {
                                 <tr className="bg-green-800">
                                     <th className="p-2">#</th>
                                     <th className="p-2">Team Name</th>
-                                    <th className="p-2">Elims</th>
+                                    <th className="p-2">Total PTS</th>
                                     <th className="p-2">Alive</th>
                                     <th className="p-2">Knocked</th>
                                     <th className="p-2">Finishes</th>
@@ -687,14 +689,7 @@ export default function AdminTeamPanel() {
                                                 <button
                                                     className="bg-green-700 w-7 h-7 rounded text-white font-bold flex items-center justify-center text-lg hover:bg-green-600 active:bg-green-800 disabled:opacity-50 shadow"
                                                     onClick={() => {
-                                                        const knocked = team.knocked_count ?? 0;
-                                                        if (knocked > 0) {
-                                                            // Alive+: revive from knocked
-                                                            updateTeam(team.id, { alive_count: team.alive_count + 1, knocked_count: knocked - 1 });
-                                                        } else {
-                                                            // Alive+: revive from eliminated
-                                                            updateTeam(team.id, { alive_count: team.alive_count + 1 });
-                                                        }
+                                                        updateTeam(team.id, { alive_count: team.alive_count + 1 });
                                                     }}
                                                     disabled={rowLoading[team.id] || team.alive_count >= 4}
                                                     aria-label="Increase alive count"
@@ -721,13 +716,11 @@ export default function AdminTeamPanel() {
                                                 <button
                                                     className="bg-yellow-700 w-7 h-7 rounded text-white font-bold flex items-center justify-center text-lg hover:bg-yellow-600 active:bg-yellow-800 disabled:opacity-50 shadow"
                                                     onClick={() => {
-                                                        // Knocked+: knock an alive player (alive→knocked)
                                                         updateTeam(team.id, {
-                                                            alive_count: team.alive_count - 1,
                                                             knocked_count: (team.knocked_count ?? 0) + 1,
                                                         });
                                                     }}
-                                                    disabled={rowLoading[team.id] || team.alive_count <= 0}
+                                                    disabled={rowLoading[team.id]}
                                                     aria-label="Increase knocked count"
                                                 >
                                                     +
