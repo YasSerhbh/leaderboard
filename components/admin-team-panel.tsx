@@ -420,6 +420,7 @@ export default function AdminTeamPanel() {
             accentBg: 'Accent Background',
             aliveColor: 'Alive Status',
             elimColor: 'Eliminated Status',
+            outsideZoneColor: 'Outside Zone',
         },
     };
 

@@ -9,6 +9,7 @@ export type Theme2Palette = {
     accentBg: string;
     aliveColor: string;
     elimColor: string;
+    outsideZoneColor: string;
 };
 
 export const DEFAULT_THEME2_PALETTE: Theme2Palette = {
@@ -19,6 +20,7 @@ export const DEFAULT_THEME2_PALETTE: Theme2Palette = {
     accentBg: '#f2e4b4',
     aliveColor: '#0f5a0d',
     elimColor: '#bc1a26',
+    outsideZoneColor: '#0068ed',
 };
 
 interface LeaderboardTheme2Props {
@@ -53,7 +55,7 @@ export const LeaderboardTheme2: React.FC<LeaderboardTheme2Props> = ({ teams, sho
     const textColor = '#ffffff';
     const aliveColor = p.aliveColor;
     const elimColor = p.elimColor;
-    // const outsideZoneColor = '#0068ed';
+    const outsideZoneColor = p.outsideZoneColor;
 
     // Determine the font to use: default to Countach local font, otherwise use provided Google Font
     const resolvedFont = (!fontFamily || fontFamily === 'Countach')
@@ -116,6 +118,13 @@ export const LeaderboardTheme2: React.FC<LeaderboardTheme2Props> = ({ teams, sho
                         const effectiveAlive = team.aliveCount + (team.knockedCount ?? 0);
                         const isEliminated = effectiveAlive === 0;
                         const displayName = team.name.slice(0, 3).toUpperCase();
+                        const isOutsideZone = team.outsideZone === true;
+                        // Blue row bg when outside zone, otherwise normal
+                        const rowBg = isOutsideZone
+                            ? outsideZoneColor
+                            : isEliminated
+                                ? `linear-gradient(to right, ${p.bodyGradientFrom}, ${p.bodyGradientTo})`
+                                : 'transparent';
                         return (
                             <tr
                                 key={team.id}
@@ -124,9 +133,7 @@ export const LeaderboardTheme2: React.FC<LeaderboardTheme2Props> = ({ teams, sho
                                     fontSize: 15,
                                     fontWeight: 400,
                                     borderBottom: '1px solid #0d0a2a',
-                                    background: isEliminated
-                                        ? `linear-gradient(to right, ${p.bodyGradientFrom}, ${p.bodyGradientTo})`
-                                        : 'transparent',
+                                    background: rowBg,
                                     filter: isEliminated ? 'brightness(0.35)' : 'none',
                                     transition: 'filter 0.3s ease, background 0.3s ease',
                                 }}
