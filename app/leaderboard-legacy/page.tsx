@@ -3,7 +3,7 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { ThemedLeaderboard, Team } from "../../components/leaderboard-themed";
+import { Leaderboard, Team } from "../../components/leaderboard";
 
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -13,14 +13,12 @@ if (supabaseUrl && supabaseKey) {
     supabase = createClient(supabaseUrl, supabaseKey);
 }
 
-export default function LiveLeaderboard2Page() {
+export default function LiveLeaderboardPage() {
     const [teams, setTeams] = useState<Team[]>([]);
-    const [showLogos, setShowLogos] = useState(true);
-    const [isVisible, setIsVisible] = useState(true);
-    const [shouldRender, setShouldRender] = useState(true);
-    const [activeTheme, setActiveTheme] = useState(1);
-    const [fontFamily, setFontFamily] = useState<string>('Countach');
-    const [colorPalette, setColorPalette] = useState<Record<string, string> | undefined>(undefined);
+    const [showLogos, setShowLogos] = useState(true); // default true
+    const [isVisible, setIsVisible] = useState(true); // controls animation state
+    const [shouldRender, setShouldRender] = useState(true); // controls DOM presence
+    const [fontFamily, setFontFamily] = useState<string>('');
 
     // Dynamically load Google Font when fontFamily changes
     useEffect(() => {
@@ -51,6 +49,7 @@ export default function LiveLeaderboard2Page() {
     // Keyboard hotkey support - press 'L' to toggle leaderboard
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
+            // Toggle on 'L' key (but not when typing in input fields)
             if (e.key === 'l' || e.key === 'L') {
                 if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
                     return;
@@ -89,12 +88,13 @@ export default function LiveLeaderboard2Page() {
                 setTeams([]);
             }
         };
-        // Fetch global settings (visibility, logos, theme, font)
+        // Fetch global settings for leaderboard (including visibility and font)
         const fetchSettings = async () => {
             const { data, error } = await supabase
                 .from("settings")
-                .select("show_logos, show_leaderboard")
-                .single<{ show_logos: boolean; show_leaderboard?: boolean }>();
+                .select("show_logos, show_leaderboard, font_family")
+                .single<{ show_logos: boolean; show_leaderboard?: boolean; font_family?: string }>();
+            console.log("Settings fetch:", { data, error });
             if (!error && data) {
                 if (typeof data.show_logos === "boolean") {
                     setShowLogos(data.show_logos);
@@ -102,29 +102,8 @@ export default function LiveLeaderboard2Page() {
                 if (typeof data.show_leaderboard === "boolean") {
                     setIsVisible(data.show_leaderboard);
                 }
-            }
-            // Fetch active_theme, font_family, and palette IDs separately so a missing column doesn't break the rest
-            const { data: themeData } = await supabase
-                .from("settings")
-                .select("active_theme, font_family, active_palette_theme1, active_palette_theme2")
-                .single<{ active_theme?: number; font_family?: string; active_palette_theme1?: number; active_palette_theme2?: number }>();
-            if (themeData) {
-                const theme = typeof themeData.active_theme === "number" ? themeData.active_theme : 1;
-                setActiveTheme(theme);
-                if (typeof themeData.font_family === "string" && themeData.font_family) {
-                    setFontFamily(themeData.font_family);
-                }
-                // Fetch the active palette colors
-                const paletteId = theme === 2 ? themeData.active_palette_theme2 : themeData.active_palette_theme1;
-                if (paletteId) {
-                    const { data: paletteData } = await supabase
-                        .from("color_palettes")
-                        .select("colors")
-                        .eq("id", paletteId)
-                        .single<{ colors: Record<string, string> }>();
-                    if (paletteData?.colors) {
-                        setColorPalette(paletteData.colors);
-                    }
+                if (typeof data.font_family === "string" && data.font_family) {
+                    setFontFamily(data.font_family);
                 }
             }
         };
@@ -132,7 +111,7 @@ export default function LiveLeaderboard2Page() {
         fetchSettings();
         // Subscribe to teams changes
         const teamsChannel = supabase
-            .channel("teams-updates-lb2")
+            .channel("teams-updates")
             .on(
                 "postgres_changes",
                 { event: "*", schema: "public", table: "teams" },
@@ -141,9 +120,9 @@ export default function LiveLeaderboard2Page() {
                 }
             )
             .subscribe();
-        // Subscribe to settings changes (for visibility toggle & theme switching from admin)
+        // Subscribe to settings changes (for visibility toggle from admin)
         const settingsChannel = supabase
-            .channel("settings-updates-lb2")
+            .channel("settings-updates")
             .on(
                 "postgres_changes",
                 { event: "*", schema: "public", table: "settings" },
@@ -152,21 +131,9 @@ export default function LiveLeaderboard2Page() {
                 }
             )
             .subscribe();
-        // Subscribe to color_palettes changes (for live palette edits)
-        const palettesChannel = supabase
-            .channel("palettes-updates-lb2")
-            .on(
-                "postgres_changes",
-                { event: "*", schema: "public", table: "color_palettes" },
-                (_payload) => {
-                    fetchSettings(); // re-fetch to get updated palette colors
-                }
-            )
-            .subscribe();
         return () => {
             supabase.removeChannel(teamsChannel);
             supabase.removeChannel(settingsChannel);
-            supabase.removeChannel(palettesChannel);
         };
     }, []);
 
@@ -220,7 +187,7 @@ export default function LiveLeaderboard2Page() {
                     className={isVisible ? 'leaderboard-enter' : 'leaderboard-exit'}
                     onAnimationEnd={handleAnimationEnd}
                 >
-                    <ThemedLeaderboard teams={teams} showLogos={showLogos} activeTheme={activeTheme} fontFamily={fontFamily} colorPalette={colorPalette} />
+                    <Leaderboard teams={teams} showLogos={showLogos} fontFamily={fontFamily || undefined} />
                 </div>
             )}
         </main>

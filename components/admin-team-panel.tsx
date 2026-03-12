@@ -80,6 +80,84 @@ export default function AdminTeamPanel() {
     const [editorName, setEditorName] = useState('');
     const [editorColors, setEditorColors] = useState<Record<string, string>>({});
     const [paletteSaving, setPaletteSaving] = useState(false);
+
+    // --- End Match / Points Management State ---
+    const [endMatchMode, setEndMatchMode] = useState<'auto' | 'manual'>('auto');
+    const [endMatchConfirm, setEndMatchConfirm] = useState(false);
+    const [endMatchLoading, setEndMatchLoading] = useState(false);
+    const [manualPastPts, setManualPastPts] = useState<{ [id: number]: string }>({});
+
+    // Placement points table
+    const PLACEMENT_POINTS: { [key: number]: number } = {
+        1: 10, 2: 6, 3: 5, 4: 4, 5: 3, 6: 2, 7: 1, 8: 1,
+    };
+    const getPlacementPoints = (placement: number): number => PLACEMENT_POINTS[placement] ?? 0;
+
+    const handleEndMatchAutomatic = async () => {
+        setEndMatchLoading(true);
+        setError("");
+        // Rank teams by finishes (descending) to determine placement
+        const ranked = [...teams]
+            .filter(t => (t.show_on_leaderboard ?? true))
+            .sort((a, b) => (b.finishes ?? 0) - (a.finishes ?? 0));
+        // For each team: match_score = placement_pts + finishes, add to elims (past pts), reset finishes
+        for (let i = 0; i < ranked.length; i++) {
+            const team = ranked[i];
+            const placementPts = getPlacementPoints(i + 1);
+            const matchScore = placementPts + (team.finishes ?? 0);
+            const newElims = (team.elims ?? 0) + matchScore;
+            const { error } = await supabase.from("teams").update({ elims: newElims, finishes: 0 }).eq("id", team.id);
+            if (error) {
+                setError(`Error updating ${team.name}: ${error.message}`);
+                break;
+            }
+        }
+        // Also reset finishes for hidden teams
+        const hiddenTeams = teams.filter(t => !(t.show_on_leaderboard ?? true));
+        for (const team of hiddenTeams) {
+            await supabase.from("teams").update({ finishes: 0 }).eq("id", team.id);
+        }
+        await fetchTeams();
+        setEndMatchConfirm(false);
+        setEndMatchLoading(false);
+    };
+
+    const handleEndMatchManual = async () => {
+        setEndMatchLoading(true);
+        setError("");
+        for (const team of teams) {
+            const manualVal = manualPastPts[team.id];
+            if (manualVal !== undefined && manualVal !== '') {
+                const value = parseInt(manualVal, 10);
+                if (!isNaN(value) && value >= 0) {
+                    const { error } = await supabase.from("teams").update({ elims: value, finishes: 0 }).eq("id", team.id);
+                    if (error) {
+                        setError(`Error updating ${team.name}: ${error.message}`);
+                        break;
+                    }
+                }
+            }
+        }
+        await fetchTeams();
+        setManualPastPts({});
+        setEndMatchLoading(false);
+    };
+
+    const handleResetPastPoints = async () => {
+        if (!window.confirm("Are you sure you want to reset ALL past points to 0? This cannot be undone.")) return;
+        setEndMatchLoading(true);
+        setError("");
+        for (const team of teams) {
+            const { error } = await supabase.from("teams").update({ elims: 0 }).eq("id", team.id);
+            if (error) {
+                setError(`Error resetting ${team.name}: ${error.message}`);
+                break;
+            }
+        }
+        await fetchTeams();
+        setEndMatchLoading(false);
+    };
+
     const FONT_OPTIONS = [
         'Countach',
         'Inter',
@@ -346,14 +424,14 @@ export default function AdminTeamPanel() {
     };
 
     return (
-        <div className="mx-auto p-4 space-y-8">
-            <div className="bg-green-950/90 rounded-xl shadow-lg p-6 mb-6 border border-green-800 w-fit">
-                <h2 className="text-2xl font-bold text-green-200 mb-4 flex items-center gap-2">
+        <div className="max-w-5xl mx-auto p-2 sm:p-4 space-y-6">
+            <div className="bg-green-950/90 rounded-xl shadow-lg p-4 sm:p-6 mb-6 border border-green-800">
+                <h2 className="text-xl sm:text-2xl font-bold text-green-200 mb-4 flex items-center gap-2">
                     <span>Team Management</span>
                 </h2>
                 {/* Show Logos Toggle */}
-                <div className="mb-4 flex items-center gap-3">
-                    <span className="text-green-300 font-semibold">Show Logos on Leaderboard:</span>
+                <div className="mb-4 flex flex-wrap items-center gap-2 sm:gap-3">
+                    <span className="text-green-300 font-semibold text-sm sm:text-base">Show Logos:</span>
                     <button
                         className={`px-4 py-2 rounded font-bold text-xs shadow ${showLogosSetting ? 'bg-green-700 text-white' : 'bg-gray-700 text-gray-300'} hover:bg-green-800 transition`}
                         onClick={() => updateShowLogosSetting(!showLogosSetting)}
@@ -363,8 +441,8 @@ export default function AdminTeamPanel() {
                     </button>
                 </div>
                 {/* Show/Hide Leaderboard Toggle for OBS */}
-                <div className="mb-4 flex items-center gap-3">
-                    <span className="text-green-300 font-semibold">Leaderboard Visibility:</span>
+                <div className="mb-4 flex flex-wrap items-center gap-2 sm:gap-3">
+                    <span className="text-green-300 font-semibold text-sm sm:text-base">Visibility:</span>
                     <button
                         className={`px-5 py-2.5 rounded font-bold text-sm shadow-lg transition-all transform hover:scale-105 ${showLeaderboardSetting ? 'bg-gradient-to-r from-amber-500 to-yellow-500 text-black hover:from-amber-600 hover:to-yellow-600' : 'bg-gradient-to-r from-red-600 to-red-700 text-white hover:from-red-700 hover:to-red-800'}`}
                         onClick={() => updateShowLeaderboardSetting(!showLeaderboardSetting)}
@@ -372,11 +450,11 @@ export default function AdminTeamPanel() {
                     >
                         {showLeaderboardSetting ? '📊 Leaderboard Visible' : '👁️ Leaderboard Hidden'}
                     </button>
-                    <span className="text-gray-400 text-xs">(Press L key on leaderboard page to toggle)</span>
+                    <span className="text-gray-400 text-xs hidden sm:inline">(Press L key on leaderboard page to toggle)</span>
                 </div>
                 {/* Active Theme Selector */}
-                <div className="mb-4 flex items-center gap-3">
-                    <span className="text-green-300 font-semibold">Active Theme:</span>
+                <div className="mb-4 flex flex-wrap items-center gap-2 sm:gap-3">
+                    <span className="text-green-300 font-semibold text-sm sm:text-base">Active Theme:</span>
                     <div className="flex gap-2">
                         {Array.from({ length: TOTAL_THEMES }, (_, i) => i + 1).map((themeNum) => (
                             <button
@@ -395,8 +473,8 @@ export default function AdminTeamPanel() {
                     </div>
                 </div>
                 {/* Font Family Selector — Autocomplete Combobox */}
-                <div className="mb-4 flex items-center gap-3 flex-wrap">
-                    <span className="text-green-300 font-semibold">Font Family:</span>
+                <div className="mb-4 flex flex-wrap items-center gap-2 sm:gap-3">
+                    <span className="text-green-300 font-semibold text-sm sm:text-base">Font Family:</span>
                     <div className="relative" style={{ minWidth: 220 }}>
                         <input
                             className="w-full px-3 py-2 rounded-lg bg-gray-800 text-white text-sm border border-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all placeholder-gray-500"
@@ -548,7 +626,166 @@ export default function AdminTeamPanel() {
                     <div className="text-red-400 mb-2 font-semibold">{error}</div>
                 )}
             </div>
-            <div className="bg-green-950/80 rounded-xl shadow-lg p-4 border border-green-800">
+
+            {/* ═══════════════════════ Match & Points Management ═══════════════════════ */}
+            <div className="bg-green-950/80 rounded-xl shadow-lg p-4 sm:p-6 border border-green-800">
+                <h2 className="text-xl sm:text-2xl font-bold text-green-200 mb-4 flex items-center gap-2">
+                    🏆 Match & Points Management
+                </h2>
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-4">
+                    <span className="text-green-300 font-semibold text-sm sm:text-base">End Match Mode:</span>
+                    <button
+                        className={`px-4 py-2 rounded font-bold text-sm shadow-lg transition-all ${
+                            endMatchMode === 'auto'
+                                ? 'bg-gradient-to-r from-amber-500 to-yellow-500 text-black'
+                                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                        }`}
+                        onClick={() => setEndMatchMode('auto')}
+                    >
+                        ⚡ Automatic
+                    </button>
+                    <button
+                        className={`px-4 py-2 rounded font-bold text-sm shadow-lg transition-all ${
+                            endMatchMode === 'manual'
+                                ? 'bg-gradient-to-r from-amber-500 to-yellow-500 text-black'
+                                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                        }`}
+                        onClick={() => setEndMatchMode('manual')}
+                    >
+                        ✏️ Manual
+                    </button>
+                </div>
+
+                {endMatchMode === 'auto' && (
+                    <div className="mb-4">
+                        <p className="text-gray-300 text-sm mb-3">
+                            Teams ranked by current finishes (kills). Placement points awarded automatically:
+                            <span className="text-amber-300"> 1st=10, 2nd=6, 3rd=5, 4th=4, 5th=3, 6th=2, 7-8th=1, 9th+=0</span>.
+                            Each team&apos;s match score (placement pts + kills) is added to past points, then finishes reset to 0.
+                        </p>
+                        {!endMatchConfirm ? (
+                            <button
+                                className="bg-gradient-to-r from-red-600 to-red-700 text-white px-6 py-2.5 rounded-lg font-bold text-sm shadow-lg hover:from-red-700 hover:to-red-800 transition-all"
+                                onClick={() => setEndMatchConfirm(true)}
+                                disabled={endMatchLoading}
+                            >
+                                🏁 End Match
+                            </button>
+                        ) : (
+                            <div className="bg-gray-900/80 rounded-lg p-4 border border-amber-500/40">
+                                <h4 className="text-amber-300 font-bold mb-2">Preview — Placement Points</h4>
+                                <div className="overflow-x-auto mb-3">
+                                    <table className="text-sm text-white">
+                                        <thead>
+                                            <tr className="text-gray-400">
+                                                <th className="px-2 py-1 text-left">#</th>
+                                                <th className="px-2 py-1 text-left">Team</th>
+                                                <th className="px-2 py-1">Kills</th>
+                                                <th className="px-2 py-1">Place Pts</th>
+                                                <th className="px-2 py-1">Match Score</th>
+                                                <th className="px-2 py-1">New Total</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {[...teams]
+                                                .filter(t => (t.show_on_leaderboard ?? true))
+                                                .sort((a, b) => (b.finishes ?? 0) - (a.finishes ?? 0))
+                                                .map((team, i) => {
+                                                    const placePts = getPlacementPoints(i + 1);
+                                                    const matchScore = placePts + (team.finishes ?? 0);
+                                                    return (
+                                                        <tr key={team.id} className="border-t border-gray-700">
+                                                            <td className="px-2 py-1">{i + 1}</td>
+                                                            <td className="px-2 py-1 font-semibold">{team.name}</td>
+                                                            <td className="px-2 py-1 text-center">{team.finishes ?? 0}</td>
+                                                            <td className="px-2 py-1 text-center text-amber-300">+{placePts}</td>
+                                                            <td className="px-2 py-1 text-center text-green-300 font-bold">{matchScore}</td>
+                                                            <td className="px-2 py-1 text-center text-white font-bold">{(team.elims ?? 0) + matchScore}</td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div className="flex gap-3">
+                                    <button
+                                        className="bg-red-600 text-white px-5 py-2 rounded-lg font-bold text-sm shadow hover:bg-red-700 disabled:opacity-50 transition"
+                                        onClick={handleEndMatchAutomatic}
+                                        disabled={endMatchLoading}
+                                    >
+                                        {endMatchLoading ? 'Processing...' : '✅ Confirm End Match'}
+                                    </button>
+                                    <button
+                                        className="bg-gray-700 text-gray-300 px-5 py-2 rounded-lg font-bold text-sm hover:bg-gray-600 transition"
+                                        onClick={() => setEndMatchConfirm(false)}
+                                        disabled={endMatchLoading}
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {endMatchMode === 'manual' && (
+                    <div className="mb-4">
+                        <p className="text-gray-300 text-sm mb-3">
+                            Manually set past points for each team. This overwrites the current past points and resets finishes to 0.
+                        </p>
+                        <div className="overflow-x-auto mb-3">
+                            <table className="text-sm text-white">
+                                <thead>
+                                    <tr className="text-gray-400">
+                                        <th className="px-2 py-1 text-left">Team</th>
+                                        <th className="px-2 py-1">Current Past Pts</th>
+                                        <th className="px-2 py-1">New Past Pts</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {teams.map((team) => (
+                                        <tr key={team.id} className="border-t border-gray-700">
+                                            <td className="px-2 py-1 font-semibold">{team.name}</td>
+                                            <td className="px-2 py-1 text-center text-gray-400">{team.elims ?? 0}</td>
+                                            <td className="px-2 py-1 text-center">
+                                                <input
+                                                    type="number"
+                                                    className="w-20 px-2 py-1 rounded border border-green-700 bg-green-900 text-white text-center font-semibold focus:outline-none focus:ring focus:ring-green-600 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                    value={manualPastPts[team.id] ?? ''}
+                                                    onChange={(e) => setManualPastPts(prev => ({ ...prev, [team.id]: e.target.value }))}
+                                                    placeholder={String(team.elims ?? 0)}
+                                                    min={0}
+                                                />
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                        <button
+                            className="bg-gradient-to-r from-amber-500 to-yellow-500 text-black px-5 py-2 rounded-lg font-bold text-sm shadow-lg hover:from-amber-600 hover:to-yellow-600 disabled:opacity-50 transition"
+                            onClick={handleEndMatchManual}
+                            disabled={endMatchLoading}
+                        >
+                            {endMatchLoading ? 'Saving...' : '💾 Save Past Points & Reset Finishes'}
+                        </button>
+                    </div>
+                )}
+
+                {/* Reset Past Points */}
+                <div className="border-t border-green-800 pt-4 mt-2">
+                    <button
+                        className="bg-gradient-to-r from-gray-700 to-gray-800 text-red-300 px-5 py-2 rounded-lg font-bold text-sm shadow hover:from-red-800 hover:to-red-900 hover:text-white disabled:opacity-50 transition-all"
+                        onClick={handleResetPastPoints}
+                        disabled={endMatchLoading}
+                    >
+                        🗑️ Reset All Past Points to 0
+                    </button>
+                    <span className="text-gray-500 text-xs ml-2">(cannot be undone)</span>
+                </div>
+            </div>
+
+            <div className="bg-green-950/80 rounded-xl shadow-lg p-2 sm:p-4 border border-green-800">
                 <h3 className="text-xl font-bold text-green-200 mb-3">Teams List</h3>
                 <div className="w-full overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
                     <div className="min-w-[900px] max-w-full mx-auto" style={{ overflow: 'auto', maxHeight: '60vh' }}>
@@ -634,42 +871,11 @@ export default function AdminTeamPanel() {
                                                 </span>
                                             )}
                                         </td>
-                                        {/* ...existing code for elims, alive, logo, show, actions... */}
+                                        {/* Total PTS (read-only, auto-calculated: past pts + current finishes) */}
                                         <td className="p-2 align-middle">
-                                            <div className="flex items-center justify-center">
-                                                <input
-                                                    type="number"
-                                                    className="w-16 px-2 py-1 rounded border border-green-700 bg-green-900 text-white text-center font-semibold focus:outline-none focus:ring focus:ring-green-600 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                                    value={editingElimsId === team.id ? editingElimsValue : team.elims}
-                                                    onFocus={() => {
-                                                        setEditingElimsId(team.id);
-                                                        setEditingElimsValue(String(team.elims));
-                                                    }}
-                                                    onChange={(e) => {
-                                                        setEditingElimsValue(e.target.value);
-                                                    }}
-                                                    onBlur={() => {
-                                                        const value = parseInt(editingElimsValue, 10);
-                                                        if (!isNaN(value) && value >= 0 && value !== team.elims) {
-                                                            updateTeam(team.id, { elims: value });
-                                                        } else if (isNaN(value) || value < 0) {
-                                                            updateTeam(team.id, { elims: 0 });
-                                                        }
-                                                        setEditingElimsId(null);
-                                                        setEditingElimsValue("");
-                                                    }}
-                                                    onKeyDown={(e) => {
-                                                        if (e.key === 'Enter') {
-                                                            e.currentTarget.blur();
-                                                        } else if (e.key === 'Escape') {
-                                                            setEditingElimsId(null);
-                                                            setEditingElimsValue("");
-                                                        }
-                                                    }}
-                                                    min={0}
-                                                    disabled={rowLoading[team.id]}
-                                                    aria-label="Eliminations"
-                                                />
+                                            <div className="flex flex-col items-center justify-center">
+                                                <span className="font-bold text-lg text-amber-300">{(team.elims ?? 0) + (team.finishes ?? 0)}</span>
+                                                <span className="text-[10px] text-gray-400">({team.elims ?? 0} past + {team.finishes ?? 0} kills)</span>
                                             </div>
                                         </td>
                                         <td className="p-2 align-middle">
@@ -860,7 +1066,7 @@ export default function AdminTeamPanel() {
             </div>{/* close .bg-green-950/80... Teams List */}
 
             {/* ═══════════════════════ Color Palettes Section ═══════════════════════ */}
-            <div className="bg-green-950/80 rounded-xl shadow-lg p-6 border border-green-800">
+            <div className="bg-green-950/80 rounded-xl shadow-lg p-4 sm:p-6 border border-green-800">
                 <h2 className="text-2xl font-bold text-green-200 mb-4 flex items-center gap-2">
                     🎨 Color Palettes
                 </h2>

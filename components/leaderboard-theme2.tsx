@@ -32,7 +32,7 @@ export const LeaderboardTheme2: React.FC<LeaderboardTheme2Props> = ({ teams, sho
     // Only show teams where show_on_leaderboard is true (default to true if null/undefined)
     const visibleTeams = teams
         .filter((team) => team.show_on_leaderboard === true || team.show_on_leaderboard == null)
-        .sort((a, b) => b.elims - a.elims); // Descending by total points (elims)
+        .sort((a, b) => ((b.elims + b.finishes) - (a.elims + a.finishes))); // Descending by total points (past pts + current kills)
 
     // Dimensions
     const tableWidth = 260;
@@ -206,7 +206,7 @@ export const LeaderboardTheme2: React.FC<LeaderboardTheme2Props> = ({ teams, sho
                                     background: p.accentBg,
                                     color: '#111',
                                 }}>
-                                    {team.elims}
+                                    {team.elims + team.finishes}
                                 </td>
                                 {/* STATUS */}
                                 <td style={{

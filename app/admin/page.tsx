@@ -121,13 +121,13 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center bg-green-950">
-      <div className="bg-green-900 p-8 rounded-lg flex flex-col gap-4 w-full items-center">
-        <div className="w-full flex flex-row justify-between items-center mb-4">
-          <h2 className="text-white text-xl font-bold">Welcome, Admin!</h2>
+    <main className="min-h-screen bg-green-950">
+      <div className="bg-green-900 p-3 sm:p-6 lg:p-8 flex flex-col gap-4 w-full">
+        <div className="max-w-5xl mx-auto w-full flex flex-row justify-between items-center mb-2 sm:mb-4">
+          <h2 className="text-white text-lg sm:text-xl font-bold">Welcome, Admin!</h2>
           <button
             onClick={handleLogout}
-            className="bg-green-700 text-white font-bold py-2 px-4 rounded hover:bg-green-800 transition"
+            className="bg-green-700 text-white font-bold py-2 px-3 sm:px-4 rounded hover:bg-green-800 transition text-sm sm:text-base"
           >
             Logout
           </button>
