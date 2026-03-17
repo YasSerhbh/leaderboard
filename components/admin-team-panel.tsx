@@ -124,14 +124,16 @@ export default function AdminTeamPanel() {
 
   // Placement points table
   const PLACEMENT_POINTS: { [key: number]: number } = {
-    1: 10,
-    2: 6,
-    3: 5,
-    4: 4,
-    5: 3,
-    6: 2,
-    7: 1,
-    8: 1,
+    1: 12,
+    2: 9,
+    3: 8,
+    4: 7,
+    5: 6,
+    6: 5,
+    7: 4,
+    8: 3,
+    9: 2,
+    10: 1,
   };
   const getPlacementPoints = (placement: number): number =>
     PLACEMENT_POINTS[placement] ?? 0;
@@ -434,14 +436,12 @@ export default function AdminTeamPanel() {
         .eq("id", editingPalette.id);
     } else {
       // Create new
-      await supabase
-        .from("color_palettes")
-        .insert({
-          theme_number: paletteTab,
-          name: editorName || "Custom",
-          colors: editorColors,
-          is_default: false,
-        });
+      await supabase.from("color_palettes").insert({
+        theme_number: paletteTab,
+        name: editorName || "Custom",
+        colors: editorColors,
+        is_default: false,
+      });
     }
     setPaletteSaving(false);
     setPaletteEditorOpen(false);
