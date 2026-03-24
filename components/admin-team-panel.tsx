@@ -40,6 +40,8 @@ const supabase = createClient(supabaseUrl!, supabaseKey!);
 export default function AdminTeamPanel() {
   const [teams, setTeams] = useState<any[]>([]);
   const [error, setError] = useState("");
+  const [activeGame, setActiveGame] = useState<"freefire" | "bgmi">("freefire");
+
   // Track loading state per team id for elims and alive
   const [rowLoading, setRowLoading] = useState<{ [id: number]: boolean }>({});
 
@@ -122,7 +124,7 @@ export default function AdminTeamPanel() {
     {}
   );
 
-  // Placement points table
+  // Placement points table (Free Fire)
   const PLACEMENT_POINTS: { [key: number]: number } = {
     1: 12,
     2: 9,
@@ -134,6 +136,17 @@ export default function AdminTeamPanel() {
     8: 3,
     9: 2,
     10: 1,
+  };
+
+  const PLACEMENT_POINTS_BGMI: { [key: number]: number } = {
+    1: 10,
+    2: 6,
+    3: 5,
+    4: 4,
+    5: 3,
+    6: 2,
+    7: 1,
+    8: 1,
   };
   const getPlacementPoints = (placement: number): number =>
     PLACEMENT_POINTS[placement] ?? 0;
@@ -148,7 +161,12 @@ export default function AdminTeamPanel() {
     // For each team: match_score = placement_pts + finishes, add to elims (past pts), reset finishes
     for (let i = 0; i < ranked.length; i++) {
       const team = ranked[i];
-      const placementPts = getPlacementPoints(i + 1);
+      let placementPts = 0;
+      if (activeGame === "freefire") {
+        placementPts = getPlacementPoints(i + 1);
+      } else {
+        placementPts = PLACEMENT_POINTS_BGMI[i + 1] ?? 0;
+      }
       const matchScore = placementPts + (team.finishes ?? 0);
       const newElims = (team.elims ?? 0) + matchScore;
       const { error } = await supabase
@@ -250,6 +268,9 @@ export default function AdminTeamPanel() {
 
   useEffect(() => {
     fetchTeams();
+  }, [activeGame]);
+
+  useEffect(() => {
     fetchShowLogosSetting();
     fetchShowLeaderboardSetting();
     fetchActiveThemeSetting();
@@ -368,8 +389,9 @@ export default function AdminTeamPanel() {
     const { data, error } = await supabase
       .from("teams")
       .select(
-        "id, name, elims, alive_count, knocked_count, finishes, logo, show_on_leaderboard, outside_zone"
+        "id, name, elims, alive_count, knocked_count, finishes, logo, show_on_leaderboard, outside_zone, game"
       )
+      .eq("game", activeGame)
       .order("id", { ascending: true });
     if (!error && data) setTeams(data);
     else setError(error?.message || "Failed to fetch teams");
@@ -509,13 +531,39 @@ export default function AdminTeamPanel() {
       {/* Team Management */}
       <div className="bg-slate-900/80 rounded-2xl border border-slate-800 shadow-xl overflow-hidden">
         <div className="px-5 sm:px-6 pt-5 sm:pt-6 pb-4">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center">
-              <Settings className="w-5 h-5 text-indigo-400" />
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center">
+                <Settings className="w-5 h-5 text-indigo-400" />
+              </div>
+              <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+                Team Management
+              </h2>
             </div>
-            <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
-              Team Management
-            </h2>
+            
+            {/* Game Selector */}
+            <div className="flex bg-slate-800 rounded-xl p-1 border border-slate-700/50 w-full sm:w-auto self-start sm:self-auto shadow-inner">
+              <button
+                className={`flex-1 sm:flex-none px-6 py-2 rounded-lg font-semibold text-sm transition-all duration-300 ease-out ${
+                  activeGame === "freefire"
+                    ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg shadow-orange-500/25 ring-1 ring-white/20"
+                    : "text-slate-400 hover:text-white hover:bg-slate-700/50"
+                 }`}
+                onClick={() => setActiveGame("freefire")}
+              >
+                Free Fire
+              </button>
+              <button
+                className={`flex-1 sm:flex-none px-6 py-2 rounded-lg font-semibold text-sm transition-all duration-300 ease-out ${
+                  activeGame === "bgmi"
+                    ? "bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-lg shadow-indigo-500/25 ring-1 ring-white/20"
+                    : "text-slate-400 hover:text-white hover:bg-slate-700/50"
+                 }`}
+                onClick={() => setActiveGame("bgmi")}
+              >
+                BGMI
+              </button>
+            </div>
           </div>
 
           {/* Settings Grid */}
@@ -740,6 +788,7 @@ export default function AdminTeamPanel() {
                     finishes: 0,
                     show_on_leaderboard: true,
                     outside_zone: false,
+                    game: activeGame,
                   },
                 ]);
                 if (error) {
@@ -845,10 +894,17 @@ export default function AdminTeamPanel() {
               <p className="text-slate-400 text-sm mb-4 leading-relaxed">
                 Teams ranked by current finishes (kills). Placement points
                 awarded automatically:
-                <span className="text-amber-300 font-medium">
-                  {" "}
-                  1st=10, 2nd=6, 3rd=5, 4th=4, 5th=3, 6th=2, 7-8th=1, 9th+=0
-                </span>
+                {activeGame === "freefire" ? (
+                  <span className="text-amber-300 font-medium">
+                    {" "}
+                    1st=12, 2nd=9, 3rd=8, 4th=7, 5th=6, 6th=5, 7th=4, 8th=3, 9th=2, 10th=1
+                  </span>
+                ) : (
+                  <span className="text-blue-300 font-medium">
+                    {" "}
+                    1st=10, 2nd=6, 3rd=5, 4th=4, 5th=3, 6th=2, 7-8th=1
+                  </span>
+                )}
                 . Each team&apos;s match score (placement pts + kills) is added
                 to past points, then finishes reset to 0.
               </p>
@@ -894,7 +950,7 @@ export default function AdminTeamPanel() {
                           .filter((t) => t.show_on_leaderboard ?? true)
                           .sort((a, b) => (b.finishes ?? 0) - (a.finishes ?? 0))
                           .map((team, i) => {
-                            const placePts = getPlacementPoints(i + 1);
+                            const placePts = activeGame === "freefire" ? getPlacementPoints(i + 1) : (PLACEMENT_POINTS_BGMI[i + 1] ?? 0);
                             const matchScore = placePts + (team.finishes ?? 0);
                             return (
                               <tr
